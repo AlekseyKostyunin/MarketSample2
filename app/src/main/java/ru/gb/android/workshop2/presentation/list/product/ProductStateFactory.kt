@@ -5,16 +5,16 @@ import ru.gb.android.workshop2.domain.product.Product
 import ru.gb.android.workshop2.presentation.common.DiscountFormatter
 import ru.gb.android.workshop2.presentation.common.PriceFormatter
 
-class ProductVOFactory(
+class ProductStateFactory(
     private val discountFormatter: DiscountFormatter,
     private val priceFormatter: PriceFormatter,
 ) {
-    fun create(product: Product, promos: List<Promo>): ProductVO {
+    fun create(product: Product, promos: List<Promo>): ProductState {
         val promoForProduct: Promo? = promos.firstOrNull { promo ->
             (promo is Promo.PromoForProducts &&
                     promo.products.any { productId -> productId == product.id })
         }
-        return ProductVO(
+        return ProductState(
             id = product.id,
             name = product.name,
             image = product.image,

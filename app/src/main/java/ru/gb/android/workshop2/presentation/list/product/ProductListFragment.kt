@@ -6,7 +6,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
 import ru.gb.android.workshop2.marketsample.R
 import ru.gb.android.workshop2.marketsample.databinding.FragmentProductListBinding
 import ru.gb.android.workshop2.presentation.list.product.adapter.ProductsAdapter
@@ -18,9 +23,9 @@ class ProductListFragment : Fragment(), ProductListView {
 
     private val adapter = ProductsAdapter()
 
-    private val productListPresenter: ProductListPresenter by lazy {
-        FeatureServiceLocator.providePresenter()
-    }
+    private val productListViewModel: ProductListViewModel by viewModels(
+        factoryProducer = { FeatureServiceLocator.provideViewModelFactory()}
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,16 +43,49 @@ class ProductListFragment : Fragment(), ProductListView {
         binding.recyclerView.layoutManager = LinearLayoutManager(context)
 
         binding.swipeRefreshLayout.setOnRefreshListener {
-            productListPresenter.refresh()
+            productListViewModel.refresh()
         }
 
-        productListPresenter.onViewAttached(this)
-        productListPresenter.loadProduct()
+        productListViewModel.loadProduct()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    productListViewModel.state.collect { state ->
+                        when {
+                            state.isLoading -> showLoading()
+                            state.hasError -> {
+                                Toast.makeText(
+                                    requireContext(),
+                                    "Error wile loading data",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                productListViewModel.errorHasShown()
+                            }
+                            else -> {
+                                hideAll()
+                                showProducts(productList = state.productState)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showLoading() {
+        hideAll()
+        binding.progress.visibility = View.VISIBLE
+    }
+
+    private fun hideAll() {
+        binding.progress.visibility = View.GONE
+        binding.progress.visibility = View.GONE
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        productListPresenter.dispose()
         _binding = null
     }
 
@@ -63,7 +101,7 @@ class ProductListFragment : Fragment(), ProductListView {
         binding.swipeRefreshLayout.isRefreshing = false
     }
 
-    override fun showProducts(productList: List<ProductVO>) {
+    override fun showProducts(productList: List<ProductState>) {
         binding.recyclerView.visibility = View.VISIBLE
         adapter.submitList(productList)
     }
